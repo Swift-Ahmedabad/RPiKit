@@ -1,6 +1,7 @@
 import Foundation
 import RPiHAL
 #if os(Linux)
+import Glibc
 @preconcurrency import PeripheryKit
 #endif
 
@@ -32,6 +33,8 @@ public final class LinuxGPIO: GPIOPin, @unchecked Sendable {
             pkDirection = (initial == .high) ? .outputHigh : .outputLow
         }
         guard gpio.open(direction: pkDirection) else {
+            let err = errno
+            print("LinuxGPIO: Failed to open pin \(pinNumber) on \(chipPath) (errno: \(err))")
             throw GPIOError.openFailed(pin: pinNumber)
         }
         switch bias {
@@ -57,6 +60,8 @@ public final class LinuxGPIO: GPIOPin, @unchecked Sendable {
         case .digital(let isHigh):
             return isHigh ? .high : .low
         default:
+            let err = errno
+            print("LinuxGPIO: Failed to read pin \(pinNumber) on \(chipPath) (errno: \(err))")
             throw GPIOError.readFailed(pin: pinNumber)
         }
         #else
@@ -70,6 +75,8 @@ public final class LinuxGPIO: GPIOPin, @unchecked Sendable {
             throw GPIOError.writeFailed(pin: pinNumber)
         }
         guard gpio.write(.digital(state == .high)) else {
+            let err = errno
+            print("LinuxGPIO: Failed to write pin \(pinNumber) on \(chipPath) (errno: \(err))")
             throw GPIOError.writeFailed(pin: pinNumber)
         }
         #endif

@@ -19,11 +19,11 @@ public final class SSD1681: MonochromeDisplay, @unchecked Sendable {
     private let spi: SPIBus
     private let rst: GPIOPin
     private let dc: GPIOPin
-    private let cs: GPIOPin
+    private let cs: GPIOPin?
     private let busy: GPIOPin
     private var frameBuffer: [UInt8]
 
-    public init(spi: SPIBus, rst: GPIOPin, dc: GPIOPin, cs: GPIOPin, busy: GPIOPin) {
+    public init(spi: SPIBus, rst: GPIOPin, dc: GPIOPin, cs: GPIOPin? = nil, busy: GPIOPin) {
         self.spi = spi
         self.rst = rst
         self.dc = dc
@@ -44,13 +44,13 @@ public final class SSD1681: MonochromeDisplay, @unchecked Sendable {
         spiPath: String = "/dev/spidev0.0",
         rstPin: Int = 17,
         dcPin: Int = 25,
-        csPin: Int = 8,
+        csPin: Int? = nil,
         busyPin: Int = 24
     ) {
         let spi = LinuxSPI(path: spiPath)
         let rst = LinuxGPIO(chipPath: chipPath, pinNumber: rstPin)
         let dc = LinuxGPIO(chipPath: chipPath, pinNumber: dcPin)
-        let cs = LinuxGPIO(chipPath: chipPath, pinNumber: csPin)
+        let cs = csPin.map { LinuxGPIO(chipPath: chipPath, pinNumber: $0) }
         let busy = LinuxGPIO(chipPath: chipPath, pinNumber: busyPin)
         self.init(spi: spi, rst: rst, dc: dc, cs: cs, busy: busy)
     }
@@ -60,13 +60,13 @@ public final class SSD1681: MonochromeDisplay, @unchecked Sendable {
         spiPath: String = "/dev/spidev0.0",
         rstPin: Int = 17,
         dcPin: Int = 25,
-        csPin: Int = 8,
+        csPin: Int? = nil,
         busyPin: Int = 24
     ) {
         let spi = MockSPIBus(path: spiPath)
         let rst = MockGPIOPin(pinNumber: rstPin, initialState: .high)
         let dc = MockGPIOPin(pinNumber: dcPin, initialState: .low)
-        let cs = MockGPIOPin(pinNumber: csPin, initialState: .high)
+        let cs = csPin.map { MockGPIOPin(pinNumber: $0, initialState: .high) }
         let busy = MockGPIOPin(pinNumber: busyPin, initialState: .low)
         self.init(spi: spi, rst: rst, dc: dc, cs: cs, busy: busy)
     }
@@ -75,7 +75,13 @@ public final class SSD1681: MonochromeDisplay, @unchecked Sendable {
     public func ensureConfigured() throws {
         try rst.open(direction: .outputHigh)
         try dc.open(direction: .outputLow)
-        try cs.open(direction: .outputHigh)
+        if let cs = self.cs {
+            do {
+                try cs.open(direction: .outputHigh)
+            } catch {
+                print("SSD1681: Note - Software CS pin \(cs.pinNumber) open failed (\(error)). Using hardware SPI chip-select.")
+            }
+        }
         try busy.open(direction: .input)
         try spi.open()
     }
@@ -84,21 +90,21 @@ public final class SSD1681: MonochromeDisplay, @unchecked Sendable {
 
     private func sendCommand(_ command: UInt8) throws {
         try dc.write(.low)
-        try cs.write(.low)
+        try? cs?.write(.low)
         try spi.writeByte(command)
-        try cs.write(.high)
+        try? cs?.write(.high)
     }
 
     private func sendData(_ data: UInt8) throws {
         try dc.write(.high)
-        try cs.write(.low)
+        try? cs?.write(.low)
         try spi.writeByte(data)
-        try cs.write(.high)
+        try? cs?.write(.high)
     }
 
     private func sendBuffer(_ buffer: [UInt8]) throws {
         try dc.write(.high)
-        try cs.write(.low)
+        try? cs?.write(.low)
         // Chunk into safe 1000-byte blocks to prevent exceeding Linux spidev bufsiz
         let chunkSize = 1000
         var offset = 0
@@ -108,7 +114,7 @@ public final class SSD1681: MonochromeDisplay, @unchecked Sendable {
             try spi.write(chunk)
             offset += count
         }
-        try cs.write(.high)
+        try? cs?.write(.high)
     }
 
     private func waitUntilIdle(timeoutSeconds: Double = 6.0) {
