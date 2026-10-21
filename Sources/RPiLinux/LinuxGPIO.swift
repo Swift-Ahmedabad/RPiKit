@@ -6,7 +6,7 @@ import RPiHAL
 
 public final class LinuxGPIO: GPIOPin, @unchecked Sendable {
     public let pinNumber: Int
-    private let chipPath: String
+    public let chipPath: String
 
     #if os(Linux)
     private var gpio: GPIO
@@ -23,6 +23,7 @@ public final class LinuxGPIO: GPIOPin, @unchecked Sendable {
 
     public func open(direction: PinDirection, bias: PinBias = .none) throws {
         #if os(Linux)
+        if isConfigured { return }
         let pkDirection: GPIO.Direction
         switch direction {
         case .input:
@@ -39,7 +40,9 @@ public final class LinuxGPIO: GPIOPin, @unchecked Sendable {
         case .pullDown:
             gpio.bias = .pullDown
         case .none:
-            gpio.bias = .disable
+            // Do not override default line bias for output/general pins,
+            // as re-requesting bias on Linux cdev can reset line state.
+            break
         }
         isConfigured = true
         #endif
@@ -66,7 +69,9 @@ public final class LinuxGPIO: GPIOPin, @unchecked Sendable {
         guard isConfigured else {
             throw GPIOError.writeFailed(pin: pinNumber)
         }
-        gpio.write(.digital(state == .high))
+        guard gpio.write(.digital(state == .high)) else {
+            throw GPIOError.writeFailed(pin: pinNumber)
+        }
         #endif
     }
 

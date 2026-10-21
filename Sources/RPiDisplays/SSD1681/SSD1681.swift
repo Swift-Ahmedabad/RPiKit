@@ -31,15 +31,16 @@ public final class SSD1681: MonochromeDisplay, @unchecked Sendable {
         self.busy = busy
         self.frameBuffer = [UInt8](repeating: 0xFF, count: Self.bufferSize)
 
-        try? rst.open(direction: .outputHigh)
-        try? dc.open(direction: .outputLow)
-        try? cs.open(direction: .outputHigh)
-        try? busy.open(direction: .input)
-        try? spi.open()
+        do {
+            try ensureConfigured()
+        } catch {
+            print("SSD1681: Initial configuration warning (will retry on initialize()): \(error)")
+        }
     }
 
     #if os(Linux)
     public convenience init(
+        chipPath: String = ProcessInfo.processInfo.environment["GPIO_CHIP"] ?? "/dev/gpiochip0",
         spiPath: String = "/dev/spidev0.0",
         rstPin: Int = 17,
         dcPin: Int = 25,
@@ -47,14 +48,15 @@ public final class SSD1681: MonochromeDisplay, @unchecked Sendable {
         busyPin: Int = 24
     ) {
         let spi = LinuxSPI(path: spiPath)
-        let rst = LinuxGPIO(pinNumber: rstPin)
-        let dc = LinuxGPIO(pinNumber: dcPin)
-        let cs = LinuxGPIO(pinNumber: csPin)
-        let busy = LinuxGPIO(pinNumber: busyPin)
+        let rst = LinuxGPIO(chipPath: chipPath, pinNumber: rstPin)
+        let dc = LinuxGPIO(chipPath: chipPath, pinNumber: dcPin)
+        let cs = LinuxGPIO(chipPath: chipPath, pinNumber: csPin)
+        let busy = LinuxGPIO(chipPath: chipPath, pinNumber: busyPin)
         self.init(spi: spi, rst: rst, dc: dc, cs: cs, busy: busy)
     }
     #else
     public convenience init(
+        chipPath: String = "/dev/gpiochip0",
         spiPath: String = "/dev/spidev0.0",
         rstPin: Int = 17,
         dcPin: Int = 25,
@@ -69,6 +71,14 @@ public final class SSD1681: MonochromeDisplay, @unchecked Sendable {
         self.init(spi: spi, rst: rst, dc: dc, cs: cs, busy: busy)
     }
     #endif
+
+    public func ensureConfigured() throws {
+        try rst.open(direction: .outputHigh)
+        try dc.open(direction: .outputLow)
+        try cs.open(direction: .outputHigh)
+        try busy.open(direction: .input)
+        try spi.open()
+    }
 
     // MARK: - Low-level Communication
 
@@ -89,6 +99,7 @@ public final class SSD1681: MonochromeDisplay, @unchecked Sendable {
     private func sendBuffer(_ buffer: [UInt8]) throws {
         try dc.write(.high)
         try cs.write(.low)
+        // Chunk into safe 1000-byte blocks to prevent exceeding Linux spidev bufsiz
         let chunkSize = 1000
         var offset = 0
         while offset < buffer.count {
@@ -147,6 +158,7 @@ public final class SSD1681: MonochromeDisplay, @unchecked Sendable {
     // MARK: - Display Control
 
     public func reset() throws {
+        print("SSD1681: Hardware reset...")
         try rst.write(.high)
         Thread.sleep(forTimeInterval: 0.05)
         try rst.write(.low)
@@ -157,6 +169,8 @@ public final class SSD1681: MonochromeDisplay, @unchecked Sendable {
     }
 
     public func initialize() throws {
+        print("SSD1681: Initializing SSD1681 controller...")
+        try ensureConfigured()
         try reset()
 
         try sendCommand(0x12) // SWRESET
@@ -193,9 +207,11 @@ public final class SSD1681: MonochromeDisplay, @unchecked Sendable {
         try sendData(0x80)
 
         waitUntilIdle(timeoutSeconds: 2.0)
+        print("SSD1681: Initialization completed.")
     }
 
     public func display() throws {
+        print("SSD1681: Writing frame to 0x24 (Current) & 0x26 (Previous) RAM...")
         lock.lock()
         let bufferCopy = frameBuffer
         lock.unlock()
@@ -220,14 +236,17 @@ public final class SSD1681: MonochromeDisplay, @unchecked Sendable {
         try sendCommand(0x26)
         try sendBuffer(bufferCopy)
 
+        print("SSD1681: Triggering full display refresh (0xF7)...")
         // 3. Full refresh trigger
         try sendCommand(0x22)
         try sendData(0xF7)
         try sendCommand(0x20) // Master activation
         waitUntilIdle(timeoutSeconds: 8.0)
+        print("SSD1681: Refresh completed.")
     }
 
     public func sleep() throws {
+        print("SSD1681: Entering deep sleep...")
         try sendCommand(0x10) // Deep sleep
         try sendData(0x01)
     }
