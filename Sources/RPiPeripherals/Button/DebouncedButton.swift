@@ -55,23 +55,23 @@ public final class DebouncedButton: Sendable {
                 var candidateTimestamp = Date()
 
                 while !Task.isCancelled {
-                    let pinState = (try? pin.read()) ?? (activeLow ? .high : .low)
-                    let isRawPressed = activeLow ? (pinState == .low) : (pinState == .high)
-
-                    let now = Date()
-                    if isRawPressed != lastStablePressed {
-                        if candidatePressed == isRawPressed {
-                            if now.timeIntervalSince(candidateTimestamp) >= debounceInterval {
-                                lastStablePressed = isRawPressed
-                                continuation.yield(isRawPressed ? .pressed : .released)
-                                candidatePressed = nil
+                    if let pinState = try? pin.read() {
+                        let isRawPressed = activeLow ? (pinState == .low) : (pinState == .high)
+                        let now = Date()
+                        if isRawPressed != lastStablePressed {
+                            if candidatePressed == isRawPressed {
+                                if now.timeIntervalSince(candidateTimestamp) >= debounceInterval {
+                                    lastStablePressed = isRawPressed
+                                    continuation.yield(isRawPressed ? .pressed : .released)
+                                    candidatePressed = nil
+                                }
+                            } else {
+                                candidatePressed = isRawPressed
+                                candidateTimestamp = now
                             }
                         } else {
-                            candidatePressed = isRawPressed
-                            candidateTimestamp = now
+                            candidatePressed = nil
                         }
-                    } else {
-                        candidatePressed = nil
                     }
 
                     try? await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))

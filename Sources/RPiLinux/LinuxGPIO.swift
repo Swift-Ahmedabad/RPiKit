@@ -27,12 +27,8 @@ public final class LinuxGPIO: GPIOPin, @unchecked Sendable {
         switch direction {
         case .input:
             pkDirection = .input
-        case .output:
-            pkDirection = .output
-        case .outputLow:
-            pkDirection = .outputLow
-        case .outputHigh:
-            pkDirection = .outputHigh
+        case .output(let initial):
+            pkDirection = (initial == .high) ? .outputHigh : .outputLow
         }
         guard gpio.open(direction: pkDirection) else {
             throw GPIOError.openFailed(pin: pinNumber)
@@ -51,11 +47,14 @@ public final class LinuxGPIO: GPIOPin, @unchecked Sendable {
 
     public func read() throws -> PinState {
         #if os(Linux)
+        guard isConfigured else {
+            throw GPIOError.readFailed(pin: pinNumber)
+        }
         switch gpio.read() {
         case .digital(let isHigh):
             return isHigh ? .high : .low
         default:
-            return .low
+            throw GPIOError.readFailed(pin: pinNumber)
         }
         #else
         return .low
@@ -64,6 +63,9 @@ public final class LinuxGPIO: GPIOPin, @unchecked Sendable {
 
     public func write(_ state: PinState) throws {
         #if os(Linux)
+        guard isConfigured else {
+            throw GPIOError.writeFailed(pin: pinNumber)
+        }
         gpio.write(.digital(state == .high))
         #endif
     }
