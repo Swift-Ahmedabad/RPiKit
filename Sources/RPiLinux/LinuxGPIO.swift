@@ -27,10 +27,12 @@ public final class LinuxGPIO: GPIOPin, @unchecked Sendable {
         switch direction {
         case .input:
             pkDirection = .input
-        case .output, .outputLow:
+        case .output:
             pkDirection = .output
+        case .outputLow:
+            pkDirection = .outputLow
         case .outputHigh:
-            pkDirection = .high
+            pkDirection = .outputHigh
         }
         guard gpio.open(direction: pkDirection) else {
             throw GPIOError.openFailed(pin: pinNumber)
