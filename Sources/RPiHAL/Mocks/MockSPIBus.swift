@@ -1,36 +1,40 @@
 import Foundation
 
 public final class MockSPIBus: SPIBus, @unchecked Sendable {
-    private let lock = NSLock()
+    private let lock = Lock()
     public let path: String
-    public private(set) var isOpen: Bool = false
-    public private(set) var writtenBytes: [UInt8] = []
+    public var settings: SPISettings
+    private var _isOpen = false
+    private var _writtenBytes: [UInt8] = []
 
-    public init(path: String = "/dev/spidev0.0") {
+    public init(path: String = "/dev/spidev0.0", settings: SPISettings = .default) {
         self.path = path
+        self.settings = settings
+    }
+
+    public var isOpen: Bool {
+        lock.withLock { _isOpen }
+    }
+
+    public var writtenBytes: [UInt8] {
+        lock.withLock { _writtenBytes }
     }
 
     public func open() throws {
-        lock.lock()
-        defer { lock.unlock() }
-        self.isOpen = true
-    }
-
-    public func close() {
-        lock.lock()
-        defer { lock.unlock() }
-        self.isOpen = false
+        lock.withLock { _isOpen = true }
     }
 
     public func write(_ bytes: [UInt8]) throws {
-        lock.lock()
-        defer { lock.unlock() }
-        self.writtenBytes.append(contentsOf: bytes)
+        lock.withLock {
+            _writtenBytes.append(contentsOf: bytes)
+        }
     }
 
     public func clearHistory() {
-        lock.lock()
-        defer { lock.unlock() }
-        self.writtenBytes.removeAll()
+        lock.withLock { _writtenBytes.removeAll() }
+    }
+
+    public func close() {
+        lock.withLock { _isOpen = false }
     }
 }

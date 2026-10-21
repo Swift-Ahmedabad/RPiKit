@@ -35,7 +35,10 @@ let package = Package(
             ]
         ),
         .target(
-            name: "RPiGraphics"
+            name: "RPiGraphics",
+            dependencies: [
+                "RPiHAL",
+            ]
         ),
         .target(
             name: "RPiDisplays",

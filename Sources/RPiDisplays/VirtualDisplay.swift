@@ -1,8 +1,9 @@
+import RPiHAL
 import Foundation
 import RPiGraphics
 
 public final class VirtualDisplay: MonochromeDisplay, @unchecked Sendable {
-    private let lock = NSLock()
+    private let lock = Lock()
     public let size: Size
     private let buffer: FrameBuffer
 

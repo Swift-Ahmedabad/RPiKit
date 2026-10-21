@@ -19,7 +19,7 @@ public final class SSD1306: MonochromeDisplay, @unchecked Sendable {
     private static let controlCommand: UInt8 = 0x00
     private static let controlData: UInt8 = 0x40
 
-    private let lock = NSLock()
+    private let lock = Lock()
     private let bus: I2CBus
     private let address: UInt16
     private var frameBuffer: [UInt8]

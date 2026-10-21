@@ -15,7 +15,7 @@ public final class SSD1681: MonochromeDisplay, @unchecked Sendable {
         Size(width: Self.width, height: Self.height)
     }
 
-    private let lock = NSLock()
+    private let lock = Lock()
     private let spi: SPIBus
     private let rst: GPIOPin
     private let dc: GPIOPin

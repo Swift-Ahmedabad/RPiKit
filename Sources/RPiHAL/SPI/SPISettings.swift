@@ -12,4 +12,5 @@ public struct SPISettings: Sendable, Equatable {
     }
 
     public static let standard = SPISettings()
+    public static let `default` = SPISettings()
 }

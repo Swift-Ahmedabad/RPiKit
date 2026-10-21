@@ -1,36 +1,38 @@
 import Foundation
 
 public final class MockI2CBus: I2CBus, @unchecked Sendable {
-    private let lock = NSLock()
+    private let lock = Lock()
     public let devicePath: String
-    public private(set) var isOpen: Bool = false
-    public private(set) var transactions: [(address: UInt16, data: [UInt8])] = []
+    private var _isOpen = false
+    private var _transactions: [(address: UInt16, data: [UInt8])] = []
 
     public init(devicePath: String = "/dev/i2c-1") {
         self.devicePath = devicePath
     }
 
-    public func open() throws {
-        lock.lock()
-        defer { lock.unlock() }
-        self.isOpen = true
+    public var isOpen: Bool {
+        lock.withLock { _isOpen }
     }
 
-    public func close() {
-        lock.lock()
-        defer { lock.unlock() }
-        self.isOpen = false
+    public var transactions: [(address: UInt16, data: [UInt8])] {
+        lock.withLock { _transactions }
+    }
+
+    public func open() throws {
+        lock.withLock { _isOpen = true }
     }
 
     public func write(to address: UInt16, data: [UInt8]) throws {
-        lock.lock()
-        defer { lock.unlock() }
-        self.transactions.append((address: address, data: data))
+        lock.withLock {
+            _transactions.append((address: address, data: data))
+        }
     }
 
     public func clearHistory() {
-        lock.lock()
-        defer { lock.unlock() }
-        self.transactions.removeAll()
+        lock.withLock { _transactions.removeAll() }
+    }
+
+    public func close() {
+        lock.withLock { _isOpen = false }
     }
 }
