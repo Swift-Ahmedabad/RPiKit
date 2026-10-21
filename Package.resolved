@@ -1,0 +1,15 @@
+{
+  "originHash" : "4c4913b5cabbe1eb808f7a12aaa9a036e86987f04a9f66deafe2f4220ac7ca5e",
+  "pins" : [
+    {
+      "identity" : "peripherykit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/CmST0us/PeripheryKit.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "a02676dd096523ec792fab3574ae490b421f0364"
+      }
+    }
+  ],
+  "version" : 3
+}
