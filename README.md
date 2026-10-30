@@ -51,6 +51,10 @@ Bundled presets include:
 - SF Pro Rounded (`.roundedBold18`)
 - Menlo (`.menlo12`)
 - Standard 8x8, 8x16, 16x16, 24x24 bitmap fonts
+- GNU FreeFont Sans / Adafruit GFX "FreeSans" (`.freeSans9`, `.freeSans12`, `.freeSans18`, `.freeSans24`),
+  also exposed with SwiftUI-style aliases (`.openSans9`, `.openSans12`, `.openSans18`, `.openSans24`).
+  Source: Adafruit GFX Library `Fonts/FreeSans*pt7b.h`
+  (https://github.com/adafruit/Adafruit-GFX-Library/tree/master/Fonts), derived from the GNU FreeFont project.
 
 ---
 
