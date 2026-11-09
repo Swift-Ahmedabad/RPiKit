@@ -28,7 +28,7 @@ public struct TextRenderer {
         return maxLineChars * font.width * scale
     }
 
-    // MARK: - Proportional Font Rendering
+    // MARK: - Monochrome Rendering
 
     public static func draw(
         _ text: String,
@@ -39,9 +39,127 @@ public struct TextRenderer {
         maxWidth: Int? = nil,
         color: PixelColor = .on
     ) {
+        drawProportional(
+            text,
+            canvasSize: canvas.size,
+            at: origin,
+            font: font,
+            alignment: alignment,
+            maxWidth: maxWidth
+        ) { point in
+            canvas.setPixel(at: point, color: color)
+        }
+    }
+
+    public static func draw(
+        _ text: String,
+        into canvas: MonochromeCanvas,
+        at origin: Point,
+        font: BitmapFont,
+        scale: Int = 1,
+        alignment: TextAlignment = .left,
+        maxWidth: Int? = nil,
+        color: PixelColor = .on
+    ) {
+        drawBitmap(
+            text,
+            canvasSize: canvas.size,
+            at: origin,
+            font: font,
+            scale: scale,
+            alignment: alignment,
+            maxWidth: maxWidth
+        ) { point in
+            canvas.setPixel(at: point, color: color)
+        }
+    }
+
+    public static func drawChar(
+        _ char: Character,
+        into canvas: MonochromeCanvas,
+        at origin: Point,
+        font: BitmapFont,
+        scale: Int = 1,
+        color: PixelColor = .on
+    ) {
+        drawGlyph(char, at: origin, font: font, scale: scale) { point in
+            canvas.setPixel(at: point, color: color)
+        }
+    }
+
+    // MARK: - Colour Rendering
+
+    public static func draw(
+        _ text: String,
+        into canvas: ColorCanvas,
+        at origin: Point,
+        font: ProportionalFont,
+        alignment: TextAlignment = .left,
+        maxWidth: Int? = nil,
+        color: RGB565
+    ) {
+        drawProportional(
+            text,
+            canvasSize: canvas.size,
+            at: origin,
+            font: font,
+            alignment: alignment,
+            maxWidth: maxWidth
+        ) { point in
+            canvas.setPixel(at: point, color: color)
+        }
+    }
+
+    public static func draw(
+        _ text: String,
+        into canvas: ColorCanvas,
+        at origin: Point,
+        font: BitmapFont,
+        scale: Int = 1,
+        alignment: TextAlignment = .left,
+        maxWidth: Int? = nil,
+        color: RGB565
+    ) {
+        drawBitmap(
+            text,
+            canvasSize: canvas.size,
+            at: origin,
+            font: font,
+            scale: scale,
+            alignment: alignment,
+            maxWidth: maxWidth
+        ) { point in
+            canvas.setPixel(at: point, color: color)
+        }
+    }
+
+    public static func drawChar(
+        _ char: Character,
+        into canvas: ColorCanvas,
+        at origin: Point,
+        font: BitmapFont,
+        scale: Int = 1,
+        color: RGB565
+    ) {
+        drawGlyph(char, at: origin, font: font, scale: scale) { point in
+            canvas.setPixel(at: point, color: color)
+        }
+    }
+
+    // MARK: - Shared Layout & Rasterisation
+
+    private static func drawProportional(
+        _ text: String,
+        canvasSize: Size,
+        at origin: Point,
+        font: ProportionalFont,
+        alignment: TextAlignment,
+        maxWidth: Int?,
+        setPixel: (Point) -> Void
+    ) {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         var cursorY = origin.y
-        let boundaryWidth = maxWidth ?? (canvas.size.width - origin.x)
+        let boundaryWidth = maxWidth ?? (canvasSize.width - origin.x)
 
         for line in lines {
             let lineWidth = textWidth(line, font: font)
@@ -64,7 +182,7 @@ public struct TextRenderer {
                     cursorX = startX
                     cursorY += font.lineHeight
                 }
-                if cursorY + Int(glyph.height) > canvas.size.height {
+                if cursorY + Int(glyph.height) > canvasSize.height {
                     return
                 }
 
@@ -79,7 +197,7 @@ public struct TextRenderer {
                             if isSet {
                                 let px = cursorX + Int(glyph.left) + col
                                 let py = cursorY + Int(glyph.top) + row
-                                canvas.setPixel(at: Point(px, py), color: color)
+                                setPixel(Point(px, py))
                             }
                         }
                     }
@@ -91,23 +209,21 @@ public struct TextRenderer {
         }
     }
 
-    // MARK: - Bitmap Font Rendering
-
-    public static func draw(
+    private static func drawBitmap(
         _ text: String,
-        into canvas: MonochromeCanvas,
+        canvasSize: Size,
         at origin: Point,
         font: BitmapFont,
-        scale: Int = 1,
-        alignment: TextAlignment = .left,
-        maxWidth: Int? = nil,
-        color: PixelColor = .on
+        scale: Int,
+        alignment: TextAlignment,
+        maxWidth: Int?,
+        setPixel: (Point) -> Void
     ) {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         var cursorY = origin.y
         let charWidth = font.width * scale
         let lineHeight = (font.height + 2) * scale
-        let boundaryWidth = maxWidth ?? (canvas.size.width - origin.x)
+        let boundaryWidth = maxWidth ?? (canvasSize.width - origin.x)
 
         for line in lines {
             let lineWidth = line.count * charWidth
@@ -127,24 +243,23 @@ public struct TextRenderer {
                     cursorX = startX
                     cursorY += lineHeight
                 }
-                if cursorY + font.height * scale > canvas.size.height {
+                if cursorY + font.height * scale > canvasSize.height {
                     return
                 }
 
-                drawChar(char, into: canvas, at: Point(cursorX, cursorY), font: font, scale: scale, color: color)
+                drawGlyph(char, at: Point(cursorX, cursorY), font: font, scale: scale, setPixel: setPixel)
                 cursorX += charWidth
             }
             cursorY += lineHeight
         }
     }
 
-    public static func drawChar(
+    private static func drawGlyph(
         _ char: Character,
-        into canvas: MonochromeCanvas,
         at origin: Point,
         font: BitmapFont,
-        scale: Int = 1,
-        color: PixelColor = .on
+        scale: Int,
+        setPixel: (Point) -> Void
     ) {
         guard let asciiValue = char.asciiValue, asciiValue >= 32 && asciiValue <= 126 else { return }
         let fontIndex = Int(asciiValue - 32)
@@ -159,11 +274,11 @@ public struct TextRenderer {
                 let isPixelSet = (glyph[byteIndex] & (1 << bitIndex)) != 0
                 if isPixelSet {
                     if scale == 1 {
-                        canvas.setPixel(at: Point(origin.x + col, origin.y + row), color: color)
+                        setPixel(Point(origin.x + col, origin.y + row))
                     } else {
                         for dy in 0..<scale {
                             for dx in 0..<scale {
-                                canvas.setPixel(at: Point(origin.x + (col * scale) + dx, origin.y + (row * scale) + dy), color: color)
+                                setPixel(Point(origin.x + (col * scale) + dx, origin.y + (row * scale) + dy))
                             }
                         }
                     }

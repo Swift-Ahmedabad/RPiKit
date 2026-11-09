@@ -49,6 +49,45 @@ struct GraphicsTests {
         #expect(onPixelCount > 0)
     }
 
+    @Test("RGB565 packing and channel extraction")
+    func testRGB565() {
+        #expect(RGB565.black.rawValue == 0x0000)
+        #expect(RGB565.white.rawValue == 0xFFFF)
+
+        let orange = RGB565(hex: 0xFF8000)
+        #expect(orange.red == 0xFF)
+        #expect(abs(Int(orange.green) - 0x80) <= 3)
+        #expect(orange.blue == 0x00)
+        #expect(orange.bigEndianBytes.high == 0xFC)
+
+        // 5/6-bit channels expand back to their full 8-bit range.
+        #expect(RGB565(red: 255, green: 255, blue: 255).green == 255)
+    }
+
+    @Test("ColorFrameBuffer drawing and colour text")
+    func testColorFrameBuffer() {
+        let buffer = ColorFrameBuffer(width: 64, height: 32)
+        #expect(buffer.getPixel(at: Point(0, 0)) == .black)
+
+        buffer.setPixel(at: Point(1, 1), color: .red)
+        #expect(buffer.getPixel(at: Point(1, 1)) == .red)
+
+        buffer.fillRect(Rect(x: 10, y: 10, width: 5, height: 5), color: .green)
+        #expect(buffer.getPixel(at: Point(14, 14)) == .green)
+        #expect(buffer.getPixel(at: Point(15, 15)) == .black)
+
+        buffer.clear()
+        buffer.drawString("HI", atX: 0, y: 0, font: .font8x8, color: .yellow)
+
+        var yellowPixels = 0
+        for y in 0..<16 {
+            for x in 0..<32 where buffer.getPixel(at: Point(x, y)) == .yellow {
+                yellowPixels += 1
+            }
+        }
+        #expect(yellowPixels > 0)
+    }
+
     @Test("Font presets compatibility")
     func testFontPresets() {
         #expect(ProportionalFont.title20.name == "title20")

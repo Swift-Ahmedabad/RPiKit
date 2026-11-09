@@ -46,6 +46,53 @@ struct DisplayTests {
         #expect(mockSPI.writtenBytes.contains(0x20))
     }
 
+    @Test("ST7735 TFT initialization and RGB565 flush")
+    func testST7735() throws {
+        let mockSPI = MockSPIBus()
+        let rst = MockGPIOPin(pinNumber: 24)
+        let dc = MockGPIOPin(pinNumber: 25)
+        let cs = MockGPIOPin(pinNumber: 8)
+        let backlight = MockGPIOPin(pinNumber: 18)
+
+        let tft = ST7735(spi: mockSPI, rst: rst, dc: dc, cs: cs, backlight: backlight)
+
+        try tft.initialize()
+        #expect(tft.size == Size(width: 128, height: 160))
+        #expect(backlight.state == .high)
+        #expect(!mockSPI.writtenBytes.isEmpty)
+
+        tft.clear(color: .red)
+        tft.drawRect(Rect(x: 0, y: 0, width: 128, height: 160), color: .blue)
+        tft.drawString("TFT", atX: 4, y: 4, font: .title20, color: .white)
+        #expect(tft.getPixel(at: Point(0, 0)) == .blue)
+
+        try tft.display()
+
+        // Software reset, sleep out, memory write, and 16-bit pixel format.
+        #expect(mockSPI.writtenBytes.contains(0x01))
+        #expect(mockSPI.writtenBytes.contains(0x11))
+        #expect(mockSPI.writtenBytes.contains(0x2C))
+        #expect(mockSPI.writtenBytes.contains(0x3A))
+    }
+
+    @Test("ST7735 supports runtime rotation")
+    func testST7735Rotation() throws {
+        let tft = ST7735(
+            spi: MockSPIBus(),
+            rst: MockGPIOPin(pinNumber: 24),
+            dc: MockGPIOPin(pinNumber: 25)
+        )
+        try tft.initialize()
+        #expect(tft.size == Size(width: 128, height: 160))
+
+        try tft.setRotation(.landscape)
+        #expect(tft.size == Size(width: 160, height: 128))
+
+        tft.setPixel(at: Point(159, 127), color: .cyan)
+        #expect(tft.getPixel(at: Point(159, 127)) == .cyan)
+        #expect(tft.getPixel(at: Point(160, 0)) == .black)
+    }
+
     @Test("VirtualDisplay ASCII preview")
     func testVirtualDisplay() throws {
         let virtual = VirtualDisplay(size: Size(width: 32, height: 16))

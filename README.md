@@ -6,10 +6,11 @@ A modular, cross-platform Swift library for Raspberry Pi hardware peripherals, d
 
 - **`RPiHAL`**: Zero-dependency Hardware Abstraction Layer protocols (`GPIOPin`, `I2CBus`, `SPIBus`) and in-memory test mocks (`MockGPIOPin`, `MockI2CBus`, `MockSPIBus`).
 - **`RPiLinux`**: Concrete Linux drivers leveraging `PeripheryKit` and Linux `spidev` ioctl. Stubs on macOS for seamless development.
-- **`RPiGraphics`**: High-performance monochrome graphics engine, geometric types (`Point`, `Size`, `Rect`, `PixelColor`), frame buffers, and universal typography renderer with word-wrapping, multi-line support, and alignments (`.left`, `.center`, `.right`).
-- **`RPiDisplays`**: Unified display drivers conforming to `MonochromeDisplay`:
+- **`RPiGraphics`**: High-performance graphics engine with both monochrome (`MonochromeCanvas`, `FrameBuffer`, `PixelColor`) and colour (`ColorCanvas`, `RGB565`, `ColorFrameBuffer`) surfaces, geometric types (`Point`, `Size`, `Rect`), and a universal typography renderer with word-wrapping, multi-line support, and alignments (`.left`, `.center`, `.right`) for both surface types.
+- **`RPiDisplays`**: Unified display drivers conforming to `MonochromeDisplay` or `ColorDisplay`:
   - `SSD1306` (128x64 I2C OLED)
   - `SSD1681` (200x200 SPI Waveshare 1.54" E-Paper)
+  - `ST7735` / `TFT18` (128x160 SPI RGB565 1.8" TFT, portrait or landscape)
   - `VirtualDisplay` (In-memory ASCII terminal display for local preview/unit testing)
   - `CoalescedRenderer` (Actor for coalescing rapid state updates during slow e-paper refreshes)
 - **`RPiPeripherals`**: High-level hardware components such as `DebouncedButton` with `AsyncStream` event delivery.
@@ -83,6 +84,35 @@ for await event in button.events() {
     }
 }
 ```
+
+### 1.8" 128x160 SPI TFT (ST7735)
+
+The 8-pin module uses `VCC`, `GND`, `CS`, `RESET`, `A0/DC`, `SDA/MOSI`, `SCK`, and `LED/BL`.
+Wire `SDA`/`SCK` to the Raspberry Pi SPI0 MOSI/SCLK pins. `CS` may be tied to
+hardware CE0 (leave `csPin: nil`) or driven from a GPIO:
+
+```swift
+import RPiKit
+
+// Defaults: RST = GPIO 24, DC = GPIO 25, hardware CE0, no GPIO backlight.
+let tft = ST7735(rotation: .landscape, backlightPin: 18)
+try tft.initialize()
+
+tft.clear(color: .black)
+tft.fillRect(Rect(x: 8, y: 8, width: 80, height: 40), color: .blue)
+tft.drawString("RPiKit", atX: 12, y: 12, font: .title20, color: .white)
+tft.drawString("128x160 RGB565", atX: 12, y: 60, font: .label11, color: .yellow)
+try tft.display()
+```
+
+Colours are `RGB565`. Draw with `RGB565.red`, `.green`, `.blue`, `.white`, `.black`,
+or `RGB565(hex: 0xFF8800)` / `RGB565(red: 255, green: 136, blue: 0)`.
+
+> **Module notes:** Some 1.8" ST7735 panels have a visible border offset or swap
+> red/blue. Pass `xOffset:`/`yOffset:` (for example `xOffset: 2, yOffset: 1` for
+> green-tab modules) and/or `colorOrder: .bgr` if required. `setRotation(_:)` can
+> be called at runtime to switch between `.portrait`, `.landscape`, and their
+> upside-down variants.
 
 ---
 
@@ -333,7 +363,7 @@ Hardware pass-through in `docker-compose.yml`:
 | :--- | :--- | :--- |
 | `/dev/gpiochip0` | Character Device GPIO (cdev v2) | Used by `DebouncedButton` and hardware control lines |
 | `/dev/i2c-1` | I2C Bus 1 | Used by `SSD1306` OLED |
-| `/dev/spidev0.0` | SPI Bus 0 Chip Select 0 | Used by `SSD1681` E-Paper panel |
+| `/dev/spidev0.0` | SPI Bus 0 Chip Select 0 | Used by `SSD1681` E-Paper and `ST7735` TFT panels |
 
 ```yaml
 services:
